@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>壁に立てかけた棒のつり合い</title>
+    <style>
+        /* ベーススタイリング */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            overflow: hidden; /* 全体のスクロールは隠す */
+        }
+
+        /* アプリケーションレイアウト (横向き前提) */
+        #app {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Canvas領域 */
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: #ffffff;
+            touch-action: none; /* Canvas上でのブラウザデフォルトのスワイプ・ズームを無効化 */
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* コントロールパネル領域 */
+        #control-panel {
+            width: 350px;
+            background: #ffffff;
+            border-left: 1px solid #e0e0e0;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto; /* パネル内はスクロール可能 */
+            box-shadow: -2px 0 10px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #eee;
+            margin: 20px 0;
+            border: none;
+        }
+
+        /* コントロールグループ */
+        .control-group {
+            margin-bottom: 18px;
+        }
+        .label-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: #444;
+        }
+        .val {
+            font-weight: bold;
+            color: #2196F3;
+            font-size: 1.05rem;
+        }
+
+        /* スライダー */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 0;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #ddd;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2196F3;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* トグルスイッチ */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            color: #444;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 26px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* データ表示ボックス */
+        .data-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            color: #555;
+        }
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+        .data-val {
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1.05rem;
+        }
+        .status-container {
+            text-align: center;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .status-static {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .status-slip {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        /* ボタン */
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: bold;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            transition: background 0.2s;
+            margin-bottom: 10px;
+        }
+        button:last-child {
+            margin-bottom: 0;
+        }
+        button:active {
+            background: #d32f2f;
+        }
+        button:hover {
+            background: #e53935;
+        }
+        
+        #btn-limit {
+            background: #FF9800;
+        }
+        #btn-limit:active {
+            background: #E65100;
+        }
+        #btn-limit:hover {
+            background: #F57C00;
+        }
+
+        /* 縦向き時のオーバーレイ警告 */
+        #orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.4rem;
+            font-weight: bold;
+            z-index: 9999;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* スマホ縦向き検知 */
+        @media (orientation: portrait) {
+            #app { display: none; }
+            #orientation-warning { display: flex; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="canvas-container">
+        <canvas id="sim-canvas"></canvas>
+    </div>
+    
+    <div id="control-panel">
+        <h2>設定パラメータ</h2>
+        
+        <div class="control-group">
+            <div class="label-flex">
+                <span>床との角度 &theta;</span>
+                <span class="val"><span id="val-theta">60</span>&deg;</span>
+            </div>
+            <input type="range" id="slider-theta" min="5" max="89" step="1" value="60">
+        </div>
+        
+        <div class="control-group">
+            <div class="label-flex">
+                <span>重心位置 (A端からの割合)</span>
+                <span class="val"><span id="val-rg">0.50</span></span>
+            </div>
+            <input type="range" id="slider-rg" min="0.1" max="0.9" step="0.05" value="0.5">
+        </div>
+        
+        <div class="toggle-row" style="margin-top: 15px; margin-bottom: 5px;">
+            <span>壁の摩擦を有効にする</span>
+            <label class="switch">
+                <input type="checkbox" id="check-wall-friction">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="control-group" id="group-mu-a" style="display: none; padding-left: 15px; border-left: 3px solid #FF9800;">
+            <div class="label-flex">
+                <span>壁の静止摩擦係数 &mu;<sub>A</sub></span>
+                <span class="val"><span id="val-mu-a">0.30</span></span>
+            </div>
+            <input type="range" id="slider-mu-a" min="0.0" max="1.0" step="0.05" value="0.3">
+        </div>
+        
+        <div class="control-group">
+            <div class="label-flex">
+                <span>床の静止摩擦係数 &mu;<sub>B</sub></span>
+                <span class="val"><span id="val-mu-b">0.50</span></span>
+            </div>
+            <input type="range" id="slider-mu-b" min="0.0" max="1.0" step="0.05" value="0.5">
+        </div>
+        
+        <div class="control-group">
+            <div class="label-flex">
+                <span>棒の質量 m</span>
+                <span class="val"><span id="val-m">10</span> kg</span>
+            </div>
+            <input type="range" id="slider-m" min="1" max="20" step="1" value="10">
+        </div>
+
+        <hr class="section-divider">
+
+        <h2>シミュレーション状態</h2>
+        <div id="status-display" class="status-container status-static">
+            静止（つり合っている）
+        </div>
+        
+        <div class="data-box">
+            <div class="data-row">
+                <span>必要な静止摩擦力 <i style="font-family: serif;">f</i></span>
+                <span class="data-val"><span id="data-freq">0.0</span> N</span>
+            </div>
+            <div class="data-row">
+                <span>最大静止摩擦力 <i style="font-family: serif;">&mu;N<sub>B</sub></i></span>
+                <span class="data-val"><span id="data-fmax">0.0</span> N</span>
+            </div>
+        </div>
+
+        <button id="btn-limit">ギリギリ滑らない（倒れない）角度に設定</button>
+        <button id="btn-reset">余裕で倒れない角度に戻す</button>
+
+        <hr class="section-divider">
+
+        <h2>表示切替</h2>
+        <div class="toggle-row">
+            <span>力の矢印を表示</span>
+            <label class="switch">
+                <input type="checkbox" id="check-force" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="toggle-row">
+            <span>物理量（数値）を表示</span>
+            <label class="switch">
+                <input type="checkbox" id="check-value" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="toggle-row">
+            <span>補助線（腕の長さ）を表示</span>
+            <label class="switch">
+                <input type="checkbox" id="check-guide" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<div id="orientation-warning">
+    <p>シミュレーションを実行するには<br>端末を横向きにしてください。</p>
+</div>
+
+<script>
+    // --- キャンバスとコンテキスト ---
+    const canvasContainer = document.getElementById('canvas-container');
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- 物理パラメータ・状態変数 ---
+    const g = 9.8;           // 重力加速度 [m/s^2]
+    let setting_theta = 60;  // スライダーで設定された角度 [deg]
+    let current_theta = 60;  // シミュレーション上の現在の角度 [deg]
+    let rg_ratio = 0.5;      // 重心位置の割合 (A端からの距離 / 棒の長さ)
+    let use_wall_friction = false; // 壁の摩擦の有無
+    let mu_a = 0.3;          // 壁の静止摩擦係数
+    let mu_b = 0.5;          // 床の静止摩擦係数
+    let m = 10;              // 棒の質量 [kg]
+
+    // アニメーション用変数
+    let omega = 0;           // 角速度 [deg/s]
+    let isInteracting = false; // ユーザーがスライダー操作中かどうか
+    let lastTime = 0;
+
+    // 描画設定用変数
+    let dpr = 1;
+    let ox = 0, oy = 0;      // 壁と床の交点(原点)の座標
+    let L_px = 0;            // 棒の描画上の長さ [px]
+
+    // 表示設定トグル
+    let showForces = true;
+    let showValues = true;
+    let showGuide = true;
+
+    // --- DOM要素 ---
+    const elValTheta = document.getElementById('val-theta');
+    const elValRg = document.getElementById('val-rg');
+    const elValMuA = document.getElementById('val-mu-a');
+    const elValMuB = document.getElementById('val-mu-b');
+    const elValM = document.getElementById('val-m');
+    const elGroupMuA = document.getElementById('group-mu-a');
+    const elDataFreq = document.getElementById('data-freq');
+    const elDataFmax = document.getElementById('data-fmax');
+    const elStatus = document.getElementById('status-display');
+
+    // --- キャンバスリサイズ処理 ---
+    function resizeCanvas() {
+        const rect = canvasContainer.getBoundingClientRect();
+        dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+
+        // 描画の基準点（左下付近）を設定
+        ox = rect.width * 0.12; // さらに左に寄せる
+        oy = rect.height * 0.92; // さらに下げる
+        // 棒の長さを画面サイズに合わせて決定 (さらに長くする)
+        L_px = Math.min(rect.width * 0.75, rect.height * 0.92);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- イベントリスナー設定 ---
+    function attachSliderEvent(id, updateFn) {
+        const slider = document.getElementById(id);
+        slider.addEventListener('input', (e) => {
+            isInteracting = true;
+            updateFn(parseFloat(e.target.value));
+            resetSimulation();
+        });
+        slider.addEventListener('change', () => {
+            isInteracting = false;
+        });
+    }
+
+    attachSliderEvent('slider-theta', (val) => { setting_theta = val; });
+    attachSliderEvent('slider-rg', (val) => { rg_ratio = val; });
+    attachSliderEvent('slider-mu-a', (val) => { mu_a = val; });
+    attachSliderEvent('slider-mu-b', (val) => { mu_b = val; });
+    attachSliderEvent('slider-m', (val) => { m = val; });
+
+    document.getElementById('check-wall-friction').addEventListener('change', (e) => {
+        use_wall_friction = e.target.checked;
+        elGroupMuA.style.display = use_wall_friction ? 'block' : 'none';
+        resetSimulation();
+    });
+
+    document.getElementById('check-force').addEventListener('change', (e) => { showForces = e.target.checked; });
+    document.getElementById('check-value').addEventListener('change', (e) => { showValues = e.target.checked; });
+    document.getElementById('check-guide').addEventListener('change', (e) => { showGuide = e.target.checked; });
+
+    // ギリギリの限界角を計算して設定する機能
+    document.getElementById('btn-limit').addEventListener('click', () => {
+        const current_mu_a = use_wall_friction ? mu_a : 0;
+        // 限界角の計算式導出:
+        // f_req = f_max (= μ_B * N_B) となるθを求める
+        // tanθ = (1-rg) * (1 + μ_A * μ_B) / μ_B - μ_A
+        const tan_theta = (1 - rg_ratio) * (1 + current_mu_a * mu_b) / mu_b - current_mu_a;
+        
+        let limit_theta_rad = Math.atan(tan_theta);
+        
+        // 【修正】理論上の限界角から小数点以下を「切り上げ」ることで、
+        // 限界角よりわずかに大きい（＝ギリギリ倒れないで静止する）整数角度を設定する
+        let limit_theta_deg = Math.ceil(limit_theta_rad * 180 / Math.PI);
+        
+        // スライダーの範囲(5〜89)に収める
+        if (limit_theta_deg < 5) limit_theta_deg = 5;
+        if (limit_theta_deg > 89) limit_theta_deg = 89;
+        
+        setting_theta = limit_theta_deg;
+        document.getElementById('slider-theta').value = limit_theta_deg;
+        resetSimulation();
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        // 現在の条件で余裕で倒れない（限界角 + 15度程度）安全な角度を計算して設定
+        const current_mu_a = use_wall_friction ? mu_a : 0;
+        const tan_theta = (1 - rg_ratio) * (1 + current_mu_a * mu_b) / mu_b - current_mu_a;
+        let limit_theta_deg = Math.ceil(Math.atan(tan_theta) * 180 / Math.PI);
+        
+        let safe_theta = limit_theta_deg + 15;
+        if (safe_theta > 85) safe_theta = 85; // 立ちすぎ防止
+        if (mu_b === 0) safe_theta = 89;      // 摩擦ゼロの場合はほぼ直立
+        
+        setting_theta = safe_theta;
+        document.getElementById('slider-theta').value = safe_theta;
+        resetSimulation();
+    });
+
+    function resetSimulation() {
+        current_theta = setting_theta;
+        omega = 0;
+        updateUI();
+    }
+
+    // --- 物理演算とUI更新 ---
+    function updatePhysics(dt) {
+        // スライダー操作中は状態をリセットし続ける
+        if (isInteracting) {
+            current_theta = setting_theta;
+            omega = 0;
+            return;
+        }
+
+        const theta_rad = current_theta * Math.PI / 180;
+        const current_mu_a = use_wall_friction ? mu_a : 0;
+        
+        // 【物理公式（壁摩擦考慮版）】
+        // 壁が滑るのを最大限防ごうとする（f_A = μ_A * N_A）と仮定した場合の、床に必要な摩擦力 f_req を求める。
+        // B点まわりのモーメントのつり合い: N_A * L*sinθ + f_A * L*cosθ = mg * L*(1-rg)*cosθ
+        // f_A = μ_A * N_A を代入して N_A を解き、f_req = N_A とする。
+        let f_req = 0;
+        if (current_theta > 0) {
+            f_req = (m * g * (1 - rg_ratio)) / (Math.tan(theta_rad) + current_mu_a);
+        }
+        
+        // 鉛直方向のつり合い: N_B = mg - f_A
+        const f_A_assumed = current_mu_a * f_req;
+        const N_B = m * g - f_A_assumed;
+        
+        // 床の最大静止摩擦力
+        const f_max = mu_b * N_B;
+
+        // 浮動小数点の計算誤差を吸収するための微小マージン
+        const epsilon = 1e-5;
+
+        // 滑り判定
+        if (f_req > f_max + epsilon && current_theta > 0) {
+            // 滑る場合、つり合っていないトルクによって角加速度が生じると近似する
+            const excess = f_req - f_max;
+            const alpha_deg = - (20 + excess * 1.5); 
+            
+            omega += alpha_deg * dt;
+            current_theta += omega * dt;
+
+            // 完全に倒れたら停止
+            if (current_theta <= 0) {
+                current_theta = 0;
+                omega = 0;
+            }
+        } else if (f_req <= f_max) {
+            // 静止条件を満たしている場合
+            omega = 0;
+        }
+    }
+
+    function updateUI() {
+        // スライダー値の表示更新
+        elValTheta.innerText = setting_theta;
+        elValRg.innerText = rg_ratio.toFixed(2);
+        if (elValMuA) elValMuA.innerText = mu_a.toFixed(2);
+        elValMuB.innerText = mu_b.toFixed(2);
+        elValM.innerText = m;
+
+        // 計算
+        const theta_rad = current_theta * Math.PI / 180;
+        const current_mu_a = use_wall_friction ? mu_a : 0;
+        let f_req = 0;
+        if (current_theta > 0) {
+            f_req = (m * g * (1 - rg_ratio)) / (Math.tan(theta_rad) + current_mu_a);
+        }
+        const f_A_assumed = current_mu_a * f_req;
+        const N_B = m * g - f_A_assumed;
+        const f_max = mu_b * N_B;
+
+        // UIへの数値反映
+        elDataFreq.innerText = current_theta <= 0 ? "-" : f_req.toFixed(1);
+        elDataFmax.innerText = current_theta <= 0 ? "-" : f_max.toFixed(1);
+
+        // 浮動小数点の計算誤差を吸収するための微小マージン
+        const epsilon = 1e-5;
+
+        // ステータス表示の更新
+        if (current_theta <= 0) {
+            elStatus.innerText = "倒れました";
+            elStatus.className = "status-container status-slip";
+        } else if (f_req > f_max + epsilon) {
+            elStatus.innerText = "滑る（つり合わない）";
+            elStatus.className = "status-container status-slip";
+        } else {
+            elStatus.innerText = "静止（つり合っている）";
+            elStatus.className = "status-container status-static";
+        }
+    }
+
+    // --- 描画関数 ---
+    function drawArrow(ctx, fromX, fromY, toX, toY, color, labelText, subText) {
+        const length = Math.hypot(toX - fromX, toY - fromY);
+        
+        // 長さが短すぎる場合は描画しない
+        if (length < 2) return;
+
+        // 【修正】短いベクトルの場合は矢印の頭も小さくして形が崩れないようにする
+        let headLen = 12;
+        if (length < 24) {
+            headLen = length * 0.5;
+        }
+
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+
+        // 矢印の軸
+        ctx.beginPath();
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        // 矢印の頭
+        ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+        
+        // 【修正】視認性向上のための太い白フチ（アウトライン）
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 7;
+        ctx.stroke();
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // ラベルの描画
+        if (showValues && labelText) {
+            // 色がrgbaの場合、文字が見えやすいように不透明にする
+            const textColor = color.startsWith('rgba') ? color.replace(/[\d.]+\)$/g, '1)') : color;
+            ctx.font = "italic bold 20px 'Times New Roman', serif"; // 少し大きく、太字に
+            
+            // ラベルの配置オフセット計算 (記号が重ならないように大きく避ける)
+            let textX = toX;
+            let textY = toY;
+            if (angle > -Math.PI/4 && angle < Math.PI/4) { // 右向き (N_A)
+                textX = toX + 15; textY = toY - 15;
+            } else if (angle >= Math.PI/4 && angle <= 3*Math.PI/4) { // 下向き (mg)
+                textX = toX + 15; textY = toY + 15;
+            } else if (angle <= -Math.PI/4 && angle >= -3*Math.PI/4) { // 上向き (N_B)
+                textX = toX + 15; textY = toY - 5;
+            } else { // 左向き (f_B)
+                textX = toX - 35; textY = toY + 25;
+            }
+
+            // 【修正】テキストの白フチ
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+            ctx.lineWidth = 4;
+            ctx.strokeText(labelText, textX, textY);
+
+            ctx.fillStyle = textColor;
+            ctx.fillText(labelText, textX, textY);
+            
+            // 下付き文字がある場合
+            if (subText) {
+                const metrics = ctx.measureText(labelText);
+                ctx.font = "bold 14px 'Times New Roman', serif";
+                ctx.strokeText(subText, textX + metrics.width, textY + 5);
+                ctx.fillText(subText, textX + metrics.width, textY + 5);
+            }
+        }
+    }
+
+    function draw() {
+        // キャンバスのクリア
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 背景グリッド（オプション・今回は無しでシンプルに）
+        
+        // --- 壁と床の描画 ---
+        ctx.beginPath();
+        // 壁 (y軸方向)
+        ctx.moveTo(ox, oy - canvas.height * 0.8);
+        ctx.lineTo(ox, oy);
+        // 床 (x軸方向)
+        ctx.lineTo(ox + canvas.width * 0.8, oy);
+        
+        ctx.strokeStyle = "#9E9E9E";
+        ctx.lineWidth = 6;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        // 基準点に薄い影をつけて床と壁を強調
+        ctx.fillStyle = "rgba(158, 158, 158, 0.1)";
+        ctx.fillRect(ox, oy, canvas.width * 0.8, canvas.height * 0.5);
+
+        // --- 棒の描画 ---
+        const theta_rad = current_theta * Math.PI / 180;
+        const w = 16; // 棒の太さ
+        
+        // 中心線の端点 A_c (上端), B_c (下端)
+        const A_cx = ox + (w / 2) * Math.sin(theta_rad);
+        const B_cy = oy - (w / 2) * Math.cos(theta_rad);
+        
+        const B_cx = A_cx + L_px * Math.cos(theta_rad);
+        const A_cy = B_cy - L_px * Math.sin(theta_rad);
+
+        // 棒本体の描画
+        ctx.beginPath();
+        ctx.moveTo(A_cx, A_cy);
+        ctx.lineTo(B_cx, B_cy);
+        ctx.strokeStyle = "#CD853F"; // 木のような色
+        ctx.lineWidth = w;
+        ctx.lineCap = "butt"; // 端を四角くしてめり込みを防ぐ
+        ctx.stroke();
+
+        // 接触点の計算 (角の座標)
+        // 壁との接触点 A
+        const ax = ox;
+        const ay = A_cy + (w / 2) * Math.cos(theta_rad);
+        
+        // 床との接触点 B
+        const bx = B_cx - (w / 2) * Math.sin(theta_rad);
+        const by = oy;
+
+        // --- 接点と重心のマーク ---
+        // 重心 G
+        const gx = A_cx + L_px * rg_ratio * Math.cos(theta_rad);
+        const gy = A_cy + L_px * rg_ratio * Math.sin(theta_rad);
+        
+        ctx.beginPath();
+        ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = "#F44336";
+        ctx.fill();
+        ctx.strokeStyle = "#FFF";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // テキストラベル (A, B, G, 角度)
+        if (showValues) {
+            ctx.font = "bold 18px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+            ctx.lineWidth = 4;
+
+            // ラベル描画用ヘルパー関数
+            const drawLabel = (text, x, y) => {
+                ctx.strokeText(text, x, y);
+                ctx.fillStyle = "#333";
+                ctx.fillText(text, x, y);
+            };
+
+            // 他の要素と重ならないよう位置を調整
+            drawLabel("A", ax - 25, ay - 20);
+            drawLabel("B", bx + 25, by + 25);
+            drawLabel("G", gx + 25, gy - 20);
+            
+            // 滑り状態の判定（滑り始めたら角度を非表示にするため）
+            const current_mu_a_eval = use_wall_friction ? mu_a : 0;
+            let f_req_eval = 0;
+            if (current_theta > 0) {
+                f_req_eval = (m * g * (1 - rg_ratio)) / (Math.tan(theta_rad) + current_mu_a_eval);
+            }
+            const N_B_eval = m * g - current_mu_a_eval * f_req_eval;
+            const f_max_eval = mu_b * N_B_eval;
+            const isSlippingNow = (f_req_eval > f_max_eval + 1e-5) || (current_theta < setting_theta);
+
+            // 角度の弧を描画（静止している時、またはスライダー操作中のみ表示）
+            if ((!isSlippingNow || isInteracting) && current_theta > 0 && current_theta < 90) {
+                const arcRadius = 70; // 弧を少し大きく
+                ctx.beginPath();
+                // B_cx を中心に、左側(Math.PI)から棒の方向(Math.PI + theta_rad)まで弧を描く
+                ctx.arc(B_cx, oy, arcRadius, Math.PI, Math.PI + theta_rad);
+                
+                // 弧の白フチ
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                ctx.strokeStyle = "#9C27B0"; // 紫色
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // 角度のテキストを描画
+                const textAngle = Math.PI + theta_rad / 2;
+                const textR = arcRadius + 25;
+                const txtX = B_cx + textR * Math.cos(textAngle);
+                const txtY = oy + textR * Math.sin(textAngle);
+                
+                const thetaText = `θ=${Math.round(current_theta)}°`;
+                ctx.font = "italic bold 18px 'Times New Roman', serif";
+
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.lineWidth = 4;
+                ctx.strokeText(thetaText, txtX, txtY);
+                
+                ctx.fillStyle = "#9C27B0";
+                ctx.fillText(thetaText, txtX, txtY);
+            }
+
+            // textAlignなどを元に戻す
+            ctx.textAlign = "start";
+            ctx.textBaseline = "alphabetic";
+        }
+
+        // --- 補助線（モーメントの腕）の描画 ---
+        if (showGuide && current_theta > 0 && current_theta < 90) {
+            ctx.save();
+            ctx.lineWidth = 1.5;
+            ctx.font = "italic 14px 'Times New Roman', serif";
+            
+            // 基準点Bを通る水平・鉛直の軸（薄く）
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(bx, oy - L_px); ctx.lineTo(bx, oy + 20); // 鉛直線
+            ctx.strokeStyle = "rgba(0,0,0,0.1)";
+            ctx.stroke();
+
+            // 1. 重力(mg)の腕の長さ
+            ctx.beginPath();
+            ctx.moveTo(gx, gy); ctx.lineTo(gx, oy); // 重力の作用線の延長
+            ctx.strokeStyle = "rgba(33, 150, 243, 0.4)"; // 青系
+            ctx.stroke();
+            
+            // 腕の部分を少し下(oy + 40)に寸法線のように描画
+            const guideY = oy + 40;
+            ctx.beginPath();
+            ctx.moveTo(bx, oy); ctx.lineTo(bx, guideY + 5); // B点からの引き出し線
+            ctx.moveTo(gx, oy); ctx.lineTo(gx, guideY + 5); // G直下からの引き出し線
+            ctx.moveTo(bx, guideY); ctx.lineTo(gx, guideY); // 腕の長さの線
+            
+            // 矢印の頭
+            const dirX = gx > bx ? 1 : -1;
+            ctx.moveTo(bx + 4*dirX, guideY - 4); ctx.lineTo(bx, guideY); ctx.lineTo(bx + 4*dirX, guideY + 4);
+            ctx.moveTo(gx - 4*dirX, guideY - 4); ctx.lineTo(gx, guideY); ctx.lineTo(gx - 4*dirX, guideY + 4);
+
+            ctx.strokeStyle = "#2196F3";
+            ctx.setLineDash([]); 
+            ctx.stroke();
+            
+            // 2. 垂直抗力(N_A)の腕の長さ
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); // N_Aの作用線の延長
+            ctx.strokeStyle = "rgba(76, 175, 80, 0.4)"; // 緑系
+            ctx.stroke();
+
+            // 腕の部分を少し右(bx + 50)に寸法線のように描画
+            const guideX = bx + 50;
+            ctx.beginPath();
+            ctx.moveTo(bx, oy); ctx.lineTo(guideX + 5, oy); // B点からの引き出し線
+            ctx.moveTo(bx, ay); ctx.lineTo(guideX + 5, ay); // A高さからの引き出し線
+            ctx.moveTo(guideX, oy); ctx.lineTo(guideX, ay); // 腕の長さの線
+            
+            // 矢印の頭
+            ctx.moveTo(guideX - 4, oy - 4); ctx.lineTo(guideX, oy); ctx.lineTo(guideX + 4, oy - 4); // 下向き矢印
+            ctx.moveTo(guideX - 4, ay + 4); ctx.lineTo(guideX, ay); ctx.lineTo(guideX + 4, ay + 4); // 上向き矢印
+
+            ctx.strokeStyle = "#4CAF50";
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- 力の矢印の描画 ---
+        if (showForces && current_theta < 90) {
+            // 力の大きさをピクセル長さに変換するスケール
+            // 【修正】全体的に矢印を長くして視認性を高める (120px -> 180px 基準に拡大)
+            const force_scale = 180 / (20 * 9.8);
+            
+            const current_mu_a = use_wall_friction ? mu_a : 0;
+            const W = m * g;
+            
+            if (current_theta <= 0) {
+                // 完全に倒れ切った状態（床に横たわっている）
+                // 水平方向の摩擦力と壁からの抗力は0となり、両端の上向きの垂直抗力と重力でつり合う
+                
+                // モーメントのつり合いから、両端にかかる垂直抗力を計算
+                const N_A_up = W * (1 - rg_ratio); // A端(原点)での垂直抗力
+                const N_B_up = W * rg_ratio;       // B端での垂直抗力
+
+                // 1. 重力 W (下向き)
+                drawArrow(ctx, gx, gy, gx, gy + W * force_scale, "#2196F3", "mg");
+
+                // 2. 床からの垂直抗力 N_B (B点から上向き)
+                drawArrow(ctx, bx, by, bx, by - N_B_up * force_scale, "#4CAF50", "N", "B");
+
+                // 3. A点での垂直抗力 N_A (A点から上向きに変化)
+                drawArrow(ctx, ax, ay, ax, ay - N_A_up * force_scale, "#4CAF50", "N", "A");
+
+            } else {
+                // 立てかけている状態（静止または滑り中）
+                let f_req = W * (1 - rg_ratio) / (Math.tan(theta_rad) + current_mu_a);
+                
+                // 実際の力
+                const actual_N_A = f_req;
+                const f_A = current_mu_a * actual_N_A;
+                const N_B = W - f_A;
+                const f_max = mu_b * N_B;
+
+                // 描画用の力 (ユーザーの指示により、μに比例する限界の力を実線で同じ長さで描画)
+                const draw_N_A = f_max;
+                const draw_f_B = f_max;
+
+                // 1. 重力 W (重心から下向き)
+                drawArrow(ctx, gx, gy, gx, gy + W * force_scale, "#2196F3", "mg");
+
+                // 2. 床からの垂直抗力 N_B (B点から上向き)
+                drawArrow(ctx, bx, by, bx, by - N_B * force_scale, "#4CAF50", "N", "B");
+
+                // 3. 壁からの垂直抗力 N_A (A点から右向き)
+                // f_B と力の釣り合いの観点から同じ長さで描画
+                if (draw_N_A > 0) {
+                    drawArrow(ctx, ax, ay, ax + draw_N_A * force_scale, ay, "#4CAF50", "N", "A");
+                }
+
+                // 3-B. 壁の静止摩擦力 f_A (A点から上向き)
+                if (use_wall_friction && current_mu_a > 0) {
+                    // 【修正】物理スケール(μ_A * N_A)だとN_Aが小さいために短すぎて見えないことが多い。
+                    // 視認性を優先し、床の垂直抗力(N_B)を基準にした長さをミックスして誇張描画する。
+                    let draw_fA_len = Math.max(f_A * force_scale, N_B * current_mu_a * force_scale * 0.8);
+
+                    drawArrow(ctx, ax, ay, ax, ay - draw_fA_len, "#FF9800", "f", "A");
+                }
+
+                // 4. 床の静止摩擦力 f_B (B点から左向き)
+                // 半透明の矢印を廃止し、N_A と同じ長さの実線で描画
+                if (draw_f_B > 0) {
+                    drawArrow(ctx, bx, by, bx - draw_f_B * force_scale, by, "#FF9800", "f", "B");
+                }
+            }
+        }
+    }
+
+    // --- メインループ ---
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = (timestamp - lastTime) / 1000; // 秒単位
+        lastTime = timestamp;
+
+        // dtの異常値（タブ切り替え時など）を防ぐ
+        if (dt < 0.1) {
+            updatePhysics(dt);
+        }
+        
+        updateUI();
+        draw();
+
+        requestAnimationFrame(loop);
+    }
+
+    // --- 初期化 ---
+    window.onload = () => {
+        resizeCanvas();
+        resetSimulation();
+        requestAnimationFrame(loop);
+    };
+
+</script>
+</body>
+</html>
